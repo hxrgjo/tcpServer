@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"tcpServer/server"
 )
@@ -18,8 +19,12 @@ func main() {
 
 func callback(c net.Conn) {
 	defer c.Close()
-
 	fmt.Println("get the tcp request")
+
+	buff, _ := ioutil.ReadAll(c)
+	s := string(buff[:])
+
+	fmt.Println(s)
 
 	c.Write([]byte("test"))
 }
