@@ -3,34 +3,20 @@ package main
 import (
 	"fmt"
 	"net"
+	"tcpServer/server"
 )
 
 const (
-	Host           = "localhost"
-	Port           = "16680"
-	ConnectionType = "tcp"
+	Host = "localhost"
+	Port = "16680"
 )
 
 func main() {
-	l, err := net.Listen(ConnectionType, Host+":"+Port)
-	if err != nil {
-		fmt.Println("listen error:", err)
-		return
-	}
-
-	for {
-		c, err := l.Accept()
-		if err != nil {
-			fmt.Println("accept error:", err)
-			break
-		}
-
-		//deal with handler
-		go handleConn(c)
-	}
+	s := server.New(Host, Port)
+	s.Listen(callback)
 }
 
-func handleConn(c net.Conn) {
+func callback(c net.Conn) {
 	defer c.Close()
 
 	fmt.Println("get the tcp request")
