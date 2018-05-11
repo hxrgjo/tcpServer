@@ -8,8 +8,12 @@ import (
 const ConnectionType = "tcp"
 
 type server struct {
-	host string
-	port string
+	host        string
+	port        string
+	handlerFunc func(c net.Conn)
+}
+
+type Handler struct {
 }
 
 func New(host, port string) *server {
@@ -17,7 +21,7 @@ func New(host, port string) *server {
 	return &s
 }
 
-func (s *server) Listen(f func(net.Conn)) {
+func (s *server) Listen() {
 
 	l, err := net.Listen(ConnectionType, s.host+":"+s.port)
 	if err != nil {
@@ -33,6 +37,10 @@ func (s *server) Listen(f func(net.Conn)) {
 		}
 
 		//deal with handler
-		go f(c)
+		s.handlerFunc(c)
 	}
+}
+
+func (s *server) HandleFunc(f func(net.Conn)) {
+	s.handlerFunc = f
 }
