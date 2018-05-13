@@ -1,19 +1,23 @@
 package server
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net"
+	"net/http"
 )
 
-const ConnectionType = "tcp"
+const (
+	ConnectionType = "tcp"
+	textQuit       = "quit"
+)
 
 type server struct {
 	host        string
 	port        string
-	handlerFunc func(c net.Conn)
-}
-
-type Handler struct {
+	handlerFunc func(ctx context.Context, c net.Conn) error
 }
 
 func New(host, port string) *server {
@@ -29,6 +33,9 @@ func (s *server) Listen() {
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for {
 		c, err := l.Accept()
 		if err != nil {
@@ -36,11 +43,37 @@ func (s *server) Listen() {
 			break
 		}
 
-		//deal with handler
-		s.handlerFunc(c)
+		buff, err := ioutil.ReadAll(c)
+		if err != nil {
+			return
+		}
+
+		receiveText := string(buff)
+
+		if receiveText == textQuit {
+			cancel()
+			c.Close()
+
+			ctx, cancel = context.WithCancel(context.Background())
+
+			continue
+		}
+
+		err = s.handlerFunc(ctx, c)
 	}
 }
 
-func (s *server) HandleFunc(f func(net.Conn)) {
+func (s *server) HandleFunc(f func(ctx context.Context, c net.Conn) error) {
 	s.handlerFunc = f
+}
+
+func BasicWebServer(port string) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello!!")
+
+		//simulate time out
+		//time.Sleep(10 * time.Second)
+	})
+
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

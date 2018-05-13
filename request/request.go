@@ -1,64 +1,51 @@
 package request
 
 import (
-	"io"
+	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
 )
 
 const (
-	GET  = "GET"
-	POST = "POST"
+	GET = "GET"
 )
 
-func Get(url string, headers map[string]string, form url.Values) ([]byte, error) {
+func SendRequestWithContext(ctx context.Context, url string) (err error) {
 
-	if len(form.Encode()) > 0 {
-		url = url + "?" + form.Encode()
-	}
+	endSingal := make(chan interface{}, 1)
 
-	return sendRequest(url, headers, nil, GET)
-}
-
-func Post(url string, headers map[string]string, form url.Values) ([]byte, error) {
-	return sendRequest(url, headers, form, POST)
-}
-
-func sendRequest(url string, headers map[string]string, form url.Values, method string) ([]byte, error) {
-	var empty []byte
-
+	tr := &http.Transport{}
 	client := &http.Client{
-		Timeout: time.Duration(600 * time.Second),
+		Timeout:   time.Duration(5 * time.Second),
+		Transport: tr,
 	}
 
-	var formBody io.Reader
-	if form != nil {
-		formBody = strings.NewReader(form.Encode())
-	}
-
-	req, err := http.NewRequest(method, url, formBody)
+	req, err := http.NewRequest(GET, url, nil)
 	if err != nil {
-		return empty, err
+		return
 	}
 
-	for k, v := range headers {
-		req.Header.Add(k, v)
+	go func() {
+		resp, err := client.Do(req)
+		endSingal <- err
+		if err != nil {
+			return
+		}
+		respBody, _ := ioutil.ReadAll(resp.Body)
+		fmt.Printf("get resp.body: %s \n", string(respBody))
+		defer resp.Body.Close()
+	}()
+
+	select {
+	case <-ctx.Done():
+		tr.CancelRequest(req)
+		fmt.Printf("ctx cancel, err: %v\n", ctx.Err())
+		return ctx.Err()
+	case err := <-endSingal:
+		fmt.Printf("get end singal, err: %v\n", err)
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return empty, err
-	}
-
-	defer resp.Body.Close()
-
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return empty, err
-	}
-
-	return respBody, nil
+	return
 }
