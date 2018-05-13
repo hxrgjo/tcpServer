@@ -13,13 +13,16 @@ const (
 	Port = "16680"
 )
 
-var requestPerSecond = 30
+var requestPerSecond int32 = 30
 
 func main() {
 
+	//mock api server
 	go server.BasicWebServer("8080")
 
 	s := server.New(Host, Port)
+	s.RequestRateLimit = requestPerSecond
+
 	s.HandleFunc(callbackWithContext)
 	s.Listen()
 }

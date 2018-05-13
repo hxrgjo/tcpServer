@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sync/atomic"
+	"time"
 )
 
 const (
@@ -15,13 +17,17 @@ const (
 )
 
 type server struct {
-	host        string
-	port        string
-	handlerFunc func(ctx context.Context, c net.Conn) error
+	host                    string
+	port                    string
+	handlerFunc             func(ctx context.Context, c net.Conn) error
+	RequestRateLimit        int32
+	currentRequestPerSecond int32
+	timer                   *time.Ticker
 }
 
 func New(host, port string) *server {
-	s := server{host: host, port: port}
+	s := server{host: host, port: port, timer: time.NewTicker(5 * time.Second)}
+	go s.resetCurrentRequestPerSecond()
 	return &s
 }
 
@@ -43,6 +49,13 @@ func (s *server) Listen() {
 			break
 		}
 
+		//check rate
+		if atomic.LoadInt32(&s.currentRequestPerSecond) > s.RequestRateLimit {
+			fmt.Println("request rate is over limit")
+			c.Close()
+			continue
+		}
+
 		buff, err := ioutil.ReadAll(c)
 		if err != nil {
 			return
@@ -59,12 +72,23 @@ func (s *server) Listen() {
 			continue
 		}
 
+		atomic.AddInt32(&s.currentRequestPerSecond, 1)
+
 		go s.handlerFunc(ctx, c)
 	}
 }
 
 func (s *server) HandleFunc(f func(ctx context.Context, c net.Conn) error) {
 	s.handlerFunc = f
+}
+
+func (s *server) resetCurrentRequestPerSecond() {
+	for {
+		select {
+		case <-s.timer.C:
+			atomic.StoreInt32(&s.currentRequestPerSecond, 0)
+		}
+	}
 }
 
 func BasicWebServer(port string) {
