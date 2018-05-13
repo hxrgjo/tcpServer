@@ -59,7 +59,7 @@ func (s *server) Listen() {
 			continue
 		}
 
-		err = s.handlerFunc(ctx, c)
+		go s.handlerFunc(ctx, c)
 	}
 }
 
