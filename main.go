@@ -2,26 +2,27 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net"
 	"tcpServer/request"
 	"tcpServer/server"
 )
 
-const (
-	Host = "localhost"
-	Port = "16680"
-)
+var (
+	Host = flag.String("h", "localhost", "host")
+	Port = flag.String("p", "16680", "port")
 
-var requestPerSecond int32 = 30
+	RequestPerSecond int32 = 30
+)
 
 func main() {
 
 	//mock api server
 	go server.BasicWebServer("8080")
 
-	s := server.New(Host, Port)
-	s.RequestRateLimit = requestPerSecond
+	s := server.New(*Host, *Port)
+	s.RequestRateLimit = RequestPerSecond
 
 	s.HandleFunc(callbackWithContext)
 	s.Listen()
